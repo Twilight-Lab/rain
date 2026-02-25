@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Birthday Puja</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Montserrat:wght@300;400;600&display=swap');
+
+        :root {
+            --primary: #ffffff;
+            --accent: #ffd700;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Montserrat', sans-serif;
+            color: var(--primary);
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none; /* Let clicks pass through to canvas if needed */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .text-sequence {
+            position: absolute;
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+            transition: opacity 2.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                        transform 3s cubic-bezier(0.4, 0, 0.2, 1),
+                        filter 2.5s ease;
+            filter: blur(10px);
+            width: 80%;
+            max-width: 800px;
+        }
+
+        .text-sequence.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0px);
+        }
+
+        .text-sequence.exit {
+            opacity: 0;
+            transform: translateY(-30px) scale(1.05);
+            filter: blur(10px);
+        }
+
+        h2 {
+            font-family: 'Cinzel', serif;
+            font-weight: 400;
+            font-size: 2rem;
+            letter-spacing: 4px;
+            margin-bottom: 15px;
+            text-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        p {
+            font-size: 1rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #finale-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 5vw;
+            margin: 0;
+            background: linear-gradient(to right, #ffffff, #ffe066, #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            letter-spacing: 5px;
+            line-height: 1.2;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 3rem; }
+            h2 { font-size: 1.5rem; }
+            p { font-size: 0.8rem; }
+        }
+
+        .sparkle {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px white, 0 0 20px #ffe066;
+            animation: twinkle 2s infinite ease-in-out;
+            opacity: 0;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0; transform: scale(0.5); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        .progress-indicator {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        .progress-indicator::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: rgba(255, 255, 255, 0.8);
+            animation: dropDown 2s infinite linear;
+        }
+
+        @keyframes dropDown {
+            0% { top: -50%; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    
+    <div class="progress-indicator" id="scroll-indicator"></div>
+
+    <div id="ui-container">
+        <!-- Story Sequence -->
+        <div class="text-sequence" id="seq-1">
+            <h2>Time moves like the ocean</h2>
+            <p>Endless, deep, and beautifully relentless.</p>
+        </div>
+        
+        <div class="text-sequence" id="seq-2">
+            <h2>Every wave brings a new memory</h2>
+            <p>Every cloud softly shapes the horizon.</p>
+        </div>
+
+        <div class="text-sequence" id="seq-3">
+            <h2>But as the sun rises today...</h2>
+            <p>The tides and skies celebrate you.</p>
+        </div>
+
+        <div class="text-sequence" id="seq-4">
+            <div id="finale-text">
+                <p style="margin-bottom: 20px; font-size: 1.2rem; color: #ffe066; font-weight: 600;">Wishing you a beautiful journey ahead</p>
+                <h1>Happy Birthday<br>Puja</h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // --- 3D SCENE SETUP ---
+        let scene, camera, renderer, water, clouds = [], particles;
+        let clock = new THREE.Clock();
+        
+        // Target colors for time transition (Dawn -> Morning -> Bright Day)
+        const timeColors = {
+            dawn: {
+                sky: new THREE.Color(0x1a0b2e),
+                fog: new THREE.Color(0x3a1c4a),
+                water: new THREE.Color(0x0a1128),
+                light: new THREE.Color(0xff8866),
+                intensity: 0.5
+            },
+            sunrise: {
+                sky: new THREE.Color(0x4a3b5c),
+                fog: new THREE.Color(0x8a5a70),
+                water: new THREE.Color(0x113355),
+                light: new THREE.Color(0xffb077),
+                intensity: 1.0
+            },
+            day: {
+                sky: new THREE.Color(0x87CEEB),
+                fog: new THREE.Color(0xaad8eb),
+                water: new THREE.Color(0x006994),
+                light: new THREE.Color(0xffffee),
+                intensity: 1.5
+            }
+        };
+
+        let currentPhase = 'dawn';
+        let mainLight;
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetCameraZ = 0;
+        let speedMultiplier = 1;
+
+        init();
+        animate();
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene & Fog
+            scene = new THREE.Scene();
+            scene.background = timeColors.dawn.sky;
+            scene.fog = new THREE.FogExp2(timeColors.dawn.fog, 0.0025);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 3000);
+            camera.position.set(0, 40, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambientLight);
+
+            mainLight = new THREE.DirectionalLight(timeColors.dawn.light, timeColors.dawn.intensity);
+            mainLight.position.set(0, 100, -1000);
+            scene.add(mainLight);
+
+            // Create Ocean
+            createOcean();
+
+            // Create Clouds
+            createClouds();
+
+            // Create Floating Particles (Magic dust)
+            createParticles();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+            
+            // Support touch for parallax
+            document.addEventListener('touchmove', (e) => {
+                mouseX = (e.touches[0].clientX - window.innerWidth / 2) * 2;
+                mouseY = (e.touches[0].clientY - window.innerHeight / 2) * 2;
+            }, {passive: true});
+
+            // Start Story Sequence
+            startStory();
+        }
+
+        function createOcean() {
+            // Low-poly water using a flat-shaded plane
+            const geometry = new THREE.PlaneGeometry(3000, 3000, 100, 100);
+            geometry.rotateX(-Math.PI / 2);
+
+            // Randomize slightly for a low poly look
+            const position = geometry.attributes.position;
+            for (let i = 0; i < position.count; i++) {
+                position.setY(i, Math.random() * 2); 
+            }
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshPhongMaterial({
+                color: timeColors.dawn.water,
+                transparent: true,
+                opacity: 0.9,
+                flatShading: true,
+                shininess: 80,
+            });
+
+            water = new THREE.Mesh(geometry, material);
+            water.position.y = -10;
+            scene.add(water);
+        }
+
+        function createClouds() {
+            // Using Dodecahedrons for stylized low-poly clouds
+            const geometry = new THREE.DodecahedronGeometry(15, 0);
+            const material = new THREE.MeshLambertMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8,
+                flatShading: true
+            });
+
+            // Create clusters of clouds scattered along the Z axis
+            for (let i = 0; i < 200; i++) {
+                const cloud = new THREE.Mesh(geometry, material);
+                
+                // Random position
+                const x = (Math.random() - 0.5) * 1500;
+                const y = Math.random() * 150 + 50; // Above water
+                const z = (Math.random() - 0.5) * 3000;
+                
+                cloud.position.set(x, y, z);
+                
+                // Random scale for variation
+                const scale = Math.random() * 2 + 0.5;
+                cloud.scale.set(scale, scale * 0.6, scale);
+                
+                // Random rotation
+                cloud.rotation.y = Math.random() * Math.PI;
+                cloud.rotation.z = Math.random() * 0.2;
+
+                scene.add(cloud);
+                clouds.push(cloud);
+            }
+        }
+
+        function createParticles() {
+            const particleCount = 1500;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 2000;
+                positions[i + 1] = Math.random() * 200;
+                positions[i + 2] = (Math.random() - 0.5) * 3000;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0xffe066,
+                size: 2,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onDocumentMouseMove(event) {
+            mouseX = (event.clientX - window.innerWidth / 2);
+            mouseY = (event.clientY - window.innerHeight / 2);
+        }
+
+        // --- STORY & TIMELINE LOGIC ---
+        function startStory() {
+            const sequences = [
+                { id: 'seq-1', showAt: 2, hideAt: 7 },
+                { id: 'seq-2', showAt: 8, hideAt: 13 },
+                { id: 'seq-3', showAt: 14, hideAt: 19 },
+                { id: 'seq-4', showAt: 21, hideAt: 999 } // Finale stays
+            ];
+
+            // Color phase timeline
+            setTimeout(() => { transitionColors('sunrise'); speedMultiplier = 1.5; }, 8000);
+            setTimeout(() => { 
+                transitionColors('day'); 
+                speedMultiplier = 2.5; 
+                document.getElementById('scroll-indicator').style.opacity = '0'; // Hide indicator at finale
+            }, 18000);
+
+            sequences.forEach(seq => {
+                // Show
+                setTimeout(() => {
+                    const el = document.getElementById(seq.id);
+                    if(el) el.classList.add('active');
+                }, seq.showAt * 1000);
+
+                // Hide
+                if (seq.hideAt < 999) {
+                    setTimeout(() => {
+                        const el = document.getElementById(seq.id);
+                        if(el) {
+                            el.classList.remove('active');
+                            el.classList.add('exit');
+                        }
+                    }, seq.hideAt * 1000);
+                }
+            });
+
+            // Add celebration sparkles at the end
+            setTimeout(createHTMLSparkles, 22000);
+        }
+
+        let targetColors = timeColors.dawn;
+        let colorLerpAlpha = 1.0;
+
+        function transitionColors(phase) {
+            targetColors = timeColors[phase];
+            colorLerpAlpha = 0.0; // Reset interpolation alpha
+        }
+
+        function createHTMLSparkles() {
+            const container = document.getElementById('finale-text');
+            for(let i=0; i<10; i++) {
+                setTimeout(() => {
+                    const sparkle = document.createElement('div');
+                    sparkle.className = 'sparkle';
+                    // Random position around the text
+                    const x = (Math.random() - 0.5) * 300;
+                    const y = (Math.random() - 0.5) * 150;
+                    const size = Math.random() * 4 + 2;
+                    
+                    sparkle.style.width = size + 'px';
+                    sparkle.style.height = size + 'px';
+                    sparkle.style.left = `calc(50% + ${x}px)`;
+                    sparkle.style.top = `calc(50% + ${y}px)`;
+                    
+                    document.getElementById('ui-container').appendChild(sparkle);
+                }, i * 300);
+            }
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            render();
+        }
+
+        function render() {
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            // 1. Move Camera Forward (Time progression)
+            targetCameraZ -= 30 * delta * speedMultiplier;
+            camera.position.z += (targetCameraZ - camera.position.z) * 0.1;
+
+            // 2. Parallax effect based on mouse
+            camera.position.x += (mouseX * 0.05 - camera.position.x) * 0.02;
+            camera.position.y += (-mouseY * 0.02 + 40 - camera.position.y) * 0.02;
+            camera.lookAt(camera.position.x, 40, camera.position.z - 1000);
+
+            // 3. Animate Ocean Waves
+            const positions = water.geometry.attributes.position;
+            for (let i = 0; i < positions.count; i++) {
+                const vx = positions.getX(i);
+                const vy = positions.getY(i); // Note: due to rotation, local Y is actually local Z conceptually, but attributes map to geometry.
+                
+                // Calculate wave height based on X, local Y, and Time
+                const z = Math.sin((vx * 0.02) + (time * 1.5)) * 3 +
+                          Math.cos((vy * 0.02) + (time * 1.2)) * 3;
+                positions.setZ(i, z);
+            }
+            water.geometry.attributes.position.needsUpdate = true;
+            water.geometry.computeVertexNormals(); // Recompute lighting for waves
+
+            // Tie water position to camera so it never ends
+            water.position.z = camera.position.z;
+
+            // 4. Recycle Clouds (Endless tunnel effect)
+            clouds.forEach(cloud => {
+                // If cloud passes behind camera, move it far ahead
+                if (cloud.position.z > camera.position.z + 200) {
+                    cloud.position.z -= 3000;
+                    cloud.position.x = camera.position.x + (Math.random() - 0.5) * 1500;
+                }
+                // Gentle floating motion
+                cloud.position.y += Math.sin(time + cloud.position.x) * 0.05;
+            });
+
+            // 5. Move Particles
+            const particlePositions = particles.geometry.attributes.position.array;
+            for (let i = 0; i < particlePositions.length; i += 3) {
+                // Move them towards the camera slowly
+                particlePositions[i + 2] += 20 * delta;
+                // If passed camera, reset
+                if (particlePositions[i + 2] > camera.position.z + 100) {
+                    particlePositions[i + 2] -= 3000;
+                }
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            // 6. Smoothly Transition Colors
+            if (colorLerpAlpha < 1.0) {
+                colorLerpAlpha += delta * 0.2; // Speed of color transition
+                if (colorLerpAlpha > 1.0) colorLerpAlpha = 1.0;
+
+                scene.background.lerp(targetColors.sky, colorLerpAlpha);
+                scene.fog.color.lerp(targetColors.fog, colorLerpAlpha);
+                water.material.color.lerp(targetColors.water, colorLerpAlpha);
+                mainLight.color.lerp(targetColors.light, colorLerpAlpha);
+                mainLight.intensity = THREE.MathUtils.lerp(mainLight.intensity, targetColors.intensity, colorLerpAlpha);
+                
+                // Animate Sun rising
+                mainLight.position.y = THREE.MathUtils.lerp(mainLight.position.y, targetColors.intensity * 200, colorLerpAlpha);
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
