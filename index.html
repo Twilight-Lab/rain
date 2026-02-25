@@ -319,12 +319,13 @@
             });
 
             // Create clusters of clouds scattered along the Z axis
-            for (let i = 0; i < 200; i++) {
+            for (let i = 0; i < 300; i++) { // Increased cloud count from 200 to 300
                 const cloud = new THREE.Mesh(geometry, material);
                 
                 // Random position
                 const x = (Math.random() - 0.5) * 1500;
-                const y = Math.random() * 150 + 50; // Above water
+                // Distribute clouds lower to touch the water level (-10 to 170)
+                const y = Math.random() * 180 - 10; 
                 const z = (Math.random() - 0.5) * 3000;
                 
                 cloud.position.set(x, y, z);
@@ -349,7 +350,8 @@
 
             for (let i = 0; i < particleCount * 3; i += 3) {
                 positions[i] = (Math.random() - 0.5) * 2000;
-                positions[i + 1] = Math.random() * 200;
+                // Distributed particles down to the water
+                positions[i + 1] = Math.random() * 200 - 20; 
                 positions[i + 2] = (Math.random() - 0.5) * 3000;
             }
 
@@ -470,8 +472,9 @@
                 const vy = positions.getY(i); // Note: due to rotation, local Y is actually local Z conceptually, but attributes map to geometry.
                 
                 // Calculate wave height based on X, local Y, and Time
-                const z = Math.sin((vx * 0.02) + (time * 1.5)) * 3 +
-                          Math.cos((vy * 0.02) + (time * 1.2)) * 3;
+                // Increased amplitude from 3 to 5 to make the water visually fuller
+                const z = Math.sin((vx * 0.02) + (time * 1.5)) * 5 +
+                          Math.cos((vy * 0.02) + (time * 1.2)) * 5;
                 positions.setZ(i, z);
             }
             water.geometry.attributes.position.needsUpdate = true;
