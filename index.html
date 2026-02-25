@@ -224,10 +224,10 @@
         let mainLight;
         let targetCameraZ = 0;
         let speedMultiplier = 1;
+        let targetSpeedMultiplier = 1;
         
         // Fix: Initialize color variables before calling init() and animate()
         let targetColors = timeColors.dawn;
-        let colorLerpAlpha = 1.0;
 
         init();
         animate();
@@ -375,11 +375,10 @@
                 { id: 'seq-4', showAt: 21, hideAt: 999 } // Finale stays
             ];
 
-            // Color phase timeline
-            setTimeout(() => { transitionColors('sunrise'); speedMultiplier = 1.5; }, 8000);
+            // Color phase timeline: Start gradually early on
+            setTimeout(() => { transitionColors('sunrise'); targetSpeedMultiplier = 1.5; }, 5000);
             setTimeout(() => { 
-                transitionColors('day'); 
-                speedMultiplier = 2.5; 
+                targetSpeedMultiplier = 2.5; 
                 document.getElementById('scroll-indicator').style.opacity = '0'; // Hide indicator at finale
             }, 18000);
 
@@ -408,7 +407,6 @@
 
         function transitionColors(phase) {
             targetColors = timeColors[phase];
-            colorLerpAlpha = 0.0; // Reset interpolation alpha
         }
 
         function createHTMLSparkles() {
@@ -441,6 +439,9 @@
         function render() {
             const delta = clock.getDelta();
             const time = clock.getElapsedTime();
+
+            // Smoothly adapt speed
+            speedMultiplier += (targetSpeedMultiplier - speedMultiplier) * delta * 0.5;
 
             // 1. Move Camera Forward (Time progression)
             targetCameraZ -= 30 * delta * speedMultiplier;
@@ -490,20 +491,16 @@
             }
             particles.geometry.attributes.position.needsUpdate = true;
 
-            // 6. Smoothly Transition Colors
-            if (colorLerpAlpha < 1.0) {
-                colorLerpAlpha += delta * 0.2; // Speed of color transition
-                if (colorLerpAlpha > 1.0) colorLerpAlpha = 1.0;
-
-                scene.background.lerp(targetColors.sky, colorLerpAlpha);
-                scene.fog.color.lerp(targetColors.fog, colorLerpAlpha);
-                water.material.color.lerp(targetColors.water, colorLerpAlpha);
-                mainLight.color.lerp(targetColors.light, colorLerpAlpha);
-                mainLight.intensity = THREE.MathUtils.lerp(mainLight.intensity, targetColors.intensity, colorLerpAlpha);
-                
-                // Animate Sun rising
-                mainLight.position.y = THREE.MathUtils.lerp(mainLight.position.y, targetColors.intensity * 200, colorLerpAlpha);
-            }
+            // 6. Smoothly Transition Colors (Little by little every frame)
+            const colorTransitionSpeed = 0.05; // Extremely slow, gradual shift
+            scene.background.lerp(targetColors.sky, delta * colorTransitionSpeed);
+            scene.fog.color.lerp(targetColors.fog, delta * colorTransitionSpeed);
+            water.material.color.lerp(targetColors.water, delta * colorTransitionSpeed);
+            mainLight.color.lerp(targetColors.light, delta * colorTransitionSpeed);
+            mainLight.intensity = THREE.MathUtils.lerp(mainLight.intensity, targetColors.intensity, delta * colorTransitionSpeed);
+            
+            // Animate Sun rising slowly
+            mainLight.position.y = THREE.MathUtils.lerp(mainLight.position.y, targetColors.intensity * 200, delta * colorTransitionSpeed);
 
             renderer.render(scene, camera);
         }
