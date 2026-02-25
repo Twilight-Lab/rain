@@ -226,6 +226,10 @@
         let mouseY = 0;
         let targetCameraZ = 0;
         let speedMultiplier = 1;
+        
+        // Fix: Initialize color variables before calling init() and animate()
+        let targetColors = timeColors.dawn;
+        let colorLerpAlpha = 1.0;
 
         init();
         animate();
@@ -413,9 +417,6 @@
             // Add celebration sparkles at the end
             setTimeout(createHTMLSparkles, 22000);
         }
-
-        let targetColors = timeColors.dawn;
-        let colorLerpAlpha = 1.0;
 
         function transitionColors(phase) {
             targetColors = timeColors[phase];
